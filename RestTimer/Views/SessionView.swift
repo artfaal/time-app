@@ -106,11 +106,25 @@ private struct FinishedView: View {
                 .foregroundStyle(.green)
             Text("Готово!")
                 .font(.title3.weight(.bold))
-            Text("\(totalSets) подходов")
+            Text(setsLabel)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button("Завершить", action: onExit)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var setsLabel: String {
+        let mod10 = totalSets % 10
+        let mod100 = totalSets % 100
+        let word: String
+        if mod10 == 1 && mod100 != 11 {
+            word = "подход"
+        } else if (2...4).contains(mod10) && !(12...14).contains(mod100) {
+            word = "подхода"
+        } else {
+            word = "подходов"
+        }
+        return "\(totalSets) \(word)"
     }
 }
