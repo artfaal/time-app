@@ -1,0 +1,11 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Xcode auto-generated workspace user data
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# macOS
+.DS_Store
