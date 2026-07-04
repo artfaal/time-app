@@ -3,6 +3,11 @@ import SwiftUI
 struct SetupView: View {
     @AppStorage("totalSets") private var totalSets = 4
     @AppStorage("restSeconds") private var restSeconds = 120
+
+    // Локальные Double для Digital Crown: биндинг напрямую в @AppStorage
+    // через get/set создаёт обратную связь, и накопление поворота ломается
+    @State private var setsValue = 4.0
+    @State private var restValue = 120.0
     @State private var notificationsDenied = false
     @FocusState private var focusedField: Field?
 
@@ -14,15 +19,12 @@ struct SetupView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 adjustRow(
                     title: "Подходы",
                     display: "\(totalSets)",
                     field: .sets,
-                    value: Binding(
-                        get: { Double(totalSets) },
-                        set: { totalSets = Int($0.rounded()) }
-                    ),
+                    value: $setsValue,
                     range: 1...10,
                     step: 1
                 )
@@ -31,10 +33,7 @@ struct SetupView: View {
                     title: "Отдых",
                     display: Self.timeString(restSeconds),
                     field: .rest,
-                    value: Binding(
-                        get: { Double(restSeconds) },
-                        set: { restSeconds = Int($0.rounded()) }
-                    ),
+                    value: $restValue,
                     range: 30...300,
                     step: 15
                 )
@@ -55,10 +54,19 @@ struct SetupView: View {
                         .multilineTextAlignment(.center)
                 }
             }
-            .padding(.top, 4)
         }
-        .navigationTitle("Rest")
-        .onAppear { focusedField = .sets }
+        .scrollIndicators(.hidden)
+        .onAppear {
+            setsValue = Double(totalSets)
+            restValue = Double(restSeconds)
+            focusedField = .sets
+        }
+        .onChange(of: setsValue) { _, newValue in
+            totalSets = Int(newValue.rounded())
+        }
+        .onChange(of: restValue) { _, newValue in
+            restSeconds = Int((newValue / 15).rounded() * 15)
+        }
         .task {
             notificationsDenied = await NotificationManager.shared.authorizationDenied()
         }
@@ -75,9 +83,9 @@ struct SetupView: View {
         range: ClosedRange<Double>,
         step: Double
     ) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 1) {
             Text(title)
-                .font(.footnote)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
             HStack {
                 roundButton("minus") {
@@ -86,7 +94,7 @@ struct SetupView: View {
                 }
                 Spacer()
                 Text(display)
-                    .font(.title2.weight(.semibold))
+                    .font(.title3.weight(.semibold))
                     .monospacedDigit()
                 Spacer()
                 roundButton("plus") {
@@ -95,7 +103,7 @@ struct SetupView: View {
                 }
             }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.08)))
         .overlay(
@@ -111,7 +119,7 @@ struct SetupView: View {
             from: range.lowerBound,
             through: range.upperBound,
             by: step,
-            sensitivity: .low,
+            sensitivity: .medium,
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
@@ -120,8 +128,8 @@ struct SetupView: View {
     private func roundButton(_ systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.headline)
-                .frame(width: 34, height: 34)
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 30, height: 30)
                 .background(Circle().fill(.white.opacity(0.12)))
         }
         .buttonStyle(.plain)
