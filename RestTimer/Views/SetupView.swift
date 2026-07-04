@@ -22,7 +22,7 @@ struct SetupView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 valueCard(
                     title: "ПОДХОДЫ",
                     display: "\(totalSets)",
@@ -47,7 +47,7 @@ struct SetupView: View {
                         .font(.system(.headline, design: .rounded).weight(.black))
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 10)
                         .background(
                             Capsule().fill(
                                 LinearGradient(
@@ -70,6 +70,7 @@ struct SetupView: View {
         }
         .scrollIndicators(.hidden)
         .contentMargins(.horizontal, 2, for: .scrollContent)
+        .contentMargins(.vertical, 2, for: .scrollContent)
         .onAppear {
             setsValue = Double(totalSets)
             restSteps = Double(restSeconds / 15)
@@ -114,7 +115,7 @@ struct SetupView: View {
                     .font(.system(size: 30, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
-                    .animation(.snappy(duration: 0.2), value: display)
+                    .animation(.easeOut(duration: 0.12), value: display)
                 Spacer()
                 roundButton("plus") {
                     value.wrappedValue = min(range.upperBound, value.wrappedValue + 1)
@@ -122,7 +123,7 @@ struct SetupView: View {
                 }
             }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)

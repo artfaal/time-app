@@ -42,6 +42,16 @@ final class WorkoutModel {
         }
     }
 
+    // Свайп на экране работы: скорректировать номер текущего подхода
+    // (часть подходов могла быть сделана вне аппа)
+    func adjustCurrentSet(by delta: Int) {
+        guard phase == .working else { return }
+        let newValue = min(totalSets, max(1, currentSet + delta))
+        guard newValue != currentSet else { return }
+        currentSet = newValue
+        WKInterfaceDevice.current().play(.click)
+    }
+
     // Тап на экране отдыха: скип
     func skipRest() {
         guard case .resting = phase else { return }

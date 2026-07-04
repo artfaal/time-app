@@ -133,6 +133,16 @@ private struct WorkingView: View {
         .background(PhaseBackground(color: .green, dimmed: dimmed))
         .contentShape(Rectangle())
         .onTapGesture { model.finishSet() }
+        // Свайп: поправить номер текущего подхода (влево — вперёд,
+        // вправо — назад), если часть подходов сделана вне аппа
+        .gesture(
+            DragGesture(minimumDistance: 25)
+                .onEnded { value in
+                    let dx = value.translation.width
+                    guard abs(dx) > abs(value.translation.height) else { return }
+                    model.adjustCurrentSet(by: dx < 0 ? 1 : -1)
+                }
+        )
     }
 }
 
@@ -143,33 +153,39 @@ private struct RestingView: View {
     @Environment(\.isLuminanceReduced) private var dimmed
 
     var body: some View {
-        VStack(spacing: 0) {
-            SetSegments(total: model.totalSets, done: model.currentSet, tint: .orange)
-                .opacity(dimmed ? 0.5 : 1)
-            Spacer()
+        // ZStack: цифры строго по центру экрана, сегменты и полоса —
+        // по краям, независимо друг от друга
+        ZStack {
+            VStack(spacing: 4) {
+                SetSegments(total: model.totalSets, done: model.currentSet, tint: .orange)
+                    .opacity(dimmed ? 0.5 : 1)
+                Text("подход \(model.currentSet + 1)/\(model.totalSets)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
             // Системный таймер: тикает даже в always-on, когда апп заморожен
             Text(timerInterval: start...end, countsDown: true)
-                .font(.system(size: 56, weight: .semibold, design: .rounded))
+                .font(.system(size: 68, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .multilineTextAlignment(.center)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.6)
                 .lineLimit(1)
                 .foregroundStyle(.orange)
-            Text("подход \(model.currentSet + 1)/\(model.totalSets)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Spacer()
             if !dimmed {
-                // Полоса отдыха «сгорает» к нулю. Рисуем сами, поэтому только
-                // при активном аппе; в AOD остаются системные цифры
-                TimelineView(.periodic(from: start, by: 1)) { context in
-                    RestBar(progress: progress(at: context.date))
+                VStack {
+                    Spacer()
+                    // Полоса отдыха «сгорает» к нулю. Рисуем сами, поэтому
+                    // только при активном аппе; в AOD остаются системные цифры
+                    TimelineView(.periodic(from: start, by: 1)) { context in
+                        RestBar(progress: progress(at: context.date))
+                    }
+                    .frame(height: 8)
+                    Text("пропустить")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 2)
                 }
-                .frame(height: 8)
-                Text("пропустить")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 4)
             }
         }
         .padding(.horizontal, 8)
