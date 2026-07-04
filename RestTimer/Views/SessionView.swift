@@ -80,15 +80,17 @@ private struct WorkingView: View {
     @Environment(\.isLuminanceReduced) private var dimmed
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Text("ПОДХОД \(model.currentSet)/\(model.totalSets)")
-                .font(.title3.weight(.black))
+                .font(.title2.weight(.black))
                 .foregroundStyle(.green)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
             Image(systemName: "figure.strengthtraining.traditional")
-                .font(.system(size: 40))
+                .font(.system(size: 46))
                 .foregroundStyle(dimmed ? Color.green.opacity(0.5) : .green)
             if !dimmed {
-                Text("тап — начать отдых")
+                Text("начать отдых")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -108,31 +110,35 @@ private struct RestingView: View {
 
     var body: some View {
         ZStack {
-            // Кольцо «сгорает» к концу отдыха. Рисуем сами, поэтому только
-            // при активном аппе; в AOD остаются системные цифры
+            // Рамка-прогресс по периметру экрана «сгорает» к концу отдыха.
+            // Рисуем сами, поэтому только при активном аппе; в AOD остаются
+            // системные цифры
             if !dimmed {
                 TimelineView(.periodic(from: start, by: 1)) { context in
-                    RestRing(progress: progress(at: context.date))
+                    RestFrame(progress: progress(at: context.date))
                 }
-                .padding(4)
+                .ignoresSafeArea()
             }
             VStack(spacing: 0) {
                 // Системный таймер: тикает даже в always-on, когда апп заморожен
                 Text(timerInterval: start...end, countsDown: true)
-                    .font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .font(.system(size: 54, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
                     .foregroundStyle(.orange)
                 Text("подход \(model.currentSet + 1)/\(model.totalSets)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if !dimmed {
-                    Text("тап — скип")
+                    Text("пропустить")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .padding(.top, 2)
                 }
             }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PhaseBackground(color: .orange, dimmed: dimmed))
@@ -147,20 +153,24 @@ private struct RestingView: View {
     }
 }
 
-private struct RestRing: View {
+// Прямоугольная рамка со скруглением в форме экрана Ultra
+private struct RestFrame: View {
     let progress: Double
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 36, style: .continuous)
+    }
 
     var body: some View {
         ZStack {
-            Circle()
-                .stroke(Color.orange.opacity(0.2), lineWidth: 6)
-            Circle()
+            shape
+                .stroke(Color.orange.opacity(0.2), lineWidth: 5)
+            shape
                 .trim(from: 0, to: 1 - progress)
-                .stroke(Color.orange, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
+                .stroke(Color.orange, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .animation(.linear(duration: 1), value: progress)
         }
-        .aspectRatio(1, contentMode: .fit)
+        .padding(3)
     }
 }
 

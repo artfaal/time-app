@@ -45,6 +45,7 @@ struct SetupView: View {
                 } label: {
                     Text("СТАРТ")
                         .font(.headline)
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.green)
@@ -58,6 +59,7 @@ struct SetupView: View {
             }
         }
         .scrollIndicators(.hidden)
+        .contentMargins(.horizontal, 2, for: .scrollContent)
         .onAppear {
             setsValue = Double(totalSets)
             restValue = Double(restSeconds)
