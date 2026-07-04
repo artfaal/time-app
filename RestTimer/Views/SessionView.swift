@@ -47,14 +47,24 @@ struct SessionView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch model.phase {
-        case .working:
-            WorkingView(model: model)
-        case .resting(let start, let end):
-            RestingView(model: model, start: start, end: end)
-        case .finished:
-            FinishedView(totalSets: model.totalSets, onExit: endSession)
+        ZStack {
+            switch model.phase {
+            case .working:
+                WorkingView(model: model)
+                    .transition(phaseTransition)
+            case .resting(let start, let end):
+                RestingView(model: model, start: start, end: end)
+                    .transition(phaseTransition)
+            case .finished:
+                FinishedView(totalSets: model.totalSets, onExit: endSession)
+                    .transition(phaseTransition)
+            }
         }
+        .animation(.spring(duration: 0.35), value: model.phase)
+    }
+
+    private var phaseTransition: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.92))
     }
 }
 
@@ -75,26 +85,50 @@ private struct PhaseBackground: View {
     }
 }
 
+// Прогресс тренировки: капсула на каждый подход, сделанные заполнены
+private struct SetSegments: View {
+    let total: Int
+    let done: Int
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<total, id: \.self) { index in
+                Capsule()
+                    .fill(index < done ? tint : tint.opacity(0.25))
+                    .frame(height: 5)
+            }
+        }
+        .animation(.spring(duration: 0.4), value: done)
+    }
+}
+
 private struct WorkingView: View {
     let model: WorkoutModel
     @Environment(\.isLuminanceReduced) private var dimmed
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 0) {
+            SetSegments(total: model.totalSets, done: model.currentSet - 1, tint: .green)
+                .opacity(dimmed ? 0.5 : 1)
+            Spacer()
             Text("ПОДХОД \(model.currentSet)/\(model.totalSets)")
                 .font(.title2.weight(.black))
                 .foregroundStyle(.green)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
             Image(systemName: "figure.strengthtraining.traditional")
-                .font(.system(size: 46))
+                .font(.system(size: 44))
                 .foregroundStyle(dimmed ? Color.green.opacity(0.5) : .green)
-            if !dimmed {
-                Text("начать отдых")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+                .padding(.top, 10)
+            Spacer()
+            Text("начать отдых")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .opacity(dimmed ? 0 : 1)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PhaseBackground(color: .green, dimmed: dimmed))
         .contentShape(Rectangle())
@@ -109,37 +143,37 @@ private struct RestingView: View {
     @Environment(\.isLuminanceReduced) private var dimmed
 
     var body: some View {
-        ZStack {
-            // Рамка-прогресс по периметру экрана «сгорает» к концу отдыха.
-            // Рисуем сами, поэтому только при активном аппе; в AOD остаются
-            // системные цифры
+        VStack(spacing: 0) {
+            SetSegments(total: model.totalSets, done: model.currentSet, tint: .orange)
+                .opacity(dimmed ? 0.5 : 1)
+            Spacer()
+            // Системный таймер: тикает даже в always-on, когда апп заморожен
+            Text(timerInterval: start...end, countsDown: true)
+                .font(.system(size: 56, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+                .foregroundStyle(.orange)
+            Text("подход \(model.currentSet + 1)/\(model.totalSets)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Spacer()
             if !dimmed {
+                // Полоса отдыха «сгорает» к нулю. Рисуем сами, поэтому только
+                // при активном аппе; в AOD остаются системные цифры
                 TimelineView(.periodic(from: start, by: 1)) { context in
-                    RestFrame(progress: progress(at: context.date))
+                    RestBar(progress: progress(at: context.date))
                 }
-                .ignoresSafeArea()
+                .frame(height: 8)
+                Text("пропустить")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 4)
             }
-            VStack(spacing: 0) {
-                // Системный таймер: тикает даже в always-on, когда апп заморожен
-                Text(timerInterval: start...end, countsDown: true)
-                    .font(.system(size: 54, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                    .foregroundStyle(.orange)
-                Text("подход \(model.currentSet + 1)/\(model.totalSets)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                if !dimmed {
-                    Text("пропустить")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 2)
-                }
-            }
-            .frame(maxWidth: .infinity)
         }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PhaseBackground(color: .orange, dimmed: dimmed))
         .contentShape(Rectangle())
@@ -153,24 +187,21 @@ private struct RestingView: View {
     }
 }
 
-// Прямоугольная рамка со скруглением в форме экрана Ultra
-private struct RestFrame: View {
+private struct RestBar: View {
     let progress: Double
 
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 36, style: .continuous)
-    }
-
     var body: some View {
-        ZStack {
-            shape
-                .stroke(Color.orange.opacity(0.2), lineWidth: 5)
-            shape
-                .trim(from: 0, to: 1 - progress)
-                .stroke(Color.orange, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                .animation(.linear(duration: 1), value: progress)
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.orange.opacity(0.2))
+                Capsule()
+                    .fill(Color.orange)
+                    .frame(width: max(8, geo.size.width * (1 - progress)))
+                    .animation(.linear(duration: 1), value: progress)
+            }
         }
-        .padding(3)
+        .frame(height: 8)
     }
 }
 

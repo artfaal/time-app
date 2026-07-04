@@ -6,9 +6,11 @@ struct SetupView: View {
     @AppStorage("restSeconds") private var restSeconds = 120
 
     // Локальные Double для Digital Crown: биндинг напрямую в @AppStorage
-    // через get/set создаёт обратную связь, и накопление поворота ломается
+    // через get/set создаёт обратную связь, и накопление поворота ломается.
+    // Отдых крутим ШАГАМИ по 15 сек (2...20), а не секундами — иначе колесо
+    // приходится крутить слишком долго
     @State private var setsValue = 4.0
-    @State private var restValue = 120.0
+    @State private var restSteps = 8.0
     @State private var notificationsDenied = false
     @FocusState private var focusedField: Field?
 
@@ -21,22 +23,20 @@ struct SetupView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 8) {
-                adjustRow(
-                    title: "Подходы",
+                valueCard(
+                    title: "ПОДХОДЫ",
                     display: "\(totalSets)",
                     field: .sets,
                     value: $setsValue,
-                    range: 1...10,
-                    step: 1
+                    range: 1...10
                 )
 
-                adjustRow(
-                    title: "Отдых",
+                valueCard(
+                    title: "ОТДЫХ",
                     display: Self.timeString(restSeconds),
                     field: .rest,
-                    value: $restValue,
-                    range: 30...300,
-                    step: 15
+                    value: $restSteps,
+                    range: 2...20
                 )
 
                 Button {
@@ -44,11 +44,21 @@ struct SetupView: View {
                     onStart(totalSets, TimeInterval(restSeconds))
                 } label: {
                     Text("СТАРТ")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded).weight(.black))
+                        .foregroundStyle(.black)
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            Capsule().fill(
+                                LinearGradient(
+                                    colors: [.green, Color(red: 0.35, green: 0.9, blue: 0.55)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .buttonStyle(.plain)
 
                 if notificationsDenied {
                     Text("Уведомления запрещены — при опущенной руке вибрации не будет. Включи их для Rest в настройках часов.")
@@ -62,58 +72,67 @@ struct SetupView: View {
         .contentMargins(.horizontal, 2, for: .scrollContent)
         .onAppear {
             setsValue = Double(totalSets)
-            restValue = Double(restSeconds)
+            restSteps = Double(restSeconds / 15)
             focusedField = .sets
         }
         .onChange(of: setsValue) { _, newValue in
             totalSets = Int(newValue.rounded())
         }
-        .onChange(of: restValue) { _, newValue in
-            restSeconds = Int((newValue / 15).rounded() * 15)
+        .onChange(of: restSteps) { _, newValue in
+            restSeconds = Int(newValue.rounded()) * 15
         }
         .task {
             notificationsDenied = await NotificationManager.shared.authorizationDenied()
         }
     }
 
-    // Строка «минус — значение — плюс». Фокус (зелёная рамка) назначает
-    // Digital Crown на это значение; тап по строке переносит фокус.
+    // Карточка значения: подпись, крупное число, «минус/плюс».
+    // Фокус (подсветка) назначает Digital Crown на это значение,
+    // тап по карточке переносит фокус. Один щелчок колеса = один шаг.
     @ViewBuilder
-    private func adjustRow(
+    private func valueCard(
         title: String,
         display: String,
         field: Field,
         value: Binding<Double>,
-        range: ClosedRange<Double>,
-        step: Double
+        range: ClosedRange<Double>
     ) -> some View {
-        VStack(spacing: 1) {
+        let isFocused = focusedField == field
+
+        VStack(spacing: 0) {
             Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(isFocused ? Color.green : .secondary)
             HStack {
                 roundButton("minus") {
-                    value.wrappedValue = max(range.lowerBound, value.wrappedValue - step)
+                    value.wrappedValue = max(range.lowerBound, value.wrappedValue - 1)
                     focusedField = field
                 }
                 Spacer()
                 Text(display)
-                    .font(.title3.weight(.semibold))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
                     .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.2), value: display)
                 Spacer()
                 roundButton("plus") {
-                    value.wrappedValue = min(range.upperBound, value.wrappedValue + step)
+                    value.wrappedValue = min(range.upperBound, value.wrappedValue + 1)
                     focusedField = field
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 5)
         .padding(.horizontal, 8)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.08)))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(focusedField == field ? Color.green : .clear, lineWidth: 1.5)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(isFocused ? 0.12 : 0.06))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(isFocused ? Color.green.opacity(0.7) : .clear, lineWidth: 1.5)
+        )
+        .animation(.snappy(duration: 0.2), value: isFocused)
         .contentShape(Rectangle())
         .onTapGesture { focusedField = field }
         .focusable(true)
@@ -122,7 +141,7 @@ struct SetupView: View {
             value,
             from: range.lowerBound,
             through: range.upperBound,
-            by: step,
+            by: 1,
             sensitivity: .medium,
             isContinuous: false,
             isHapticFeedbackEnabled: true
