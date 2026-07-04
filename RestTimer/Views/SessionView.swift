@@ -58,20 +58,43 @@ struct SessionView: View {
     }
 }
 
-private struct WorkingView: View {
-    let model: WorkoutModel
+// Мягкий градиент в цвет фазы: работа — зелёный, отдых — оранжевый.
+// Фазу видно боковым зрением, не читая текст. В AOD гаснет.
+private struct PhaseBackground: View {
+    let color: Color
+    let dimmed: Bool
 
     var body: some View {
-        VStack(spacing: 10) {
+        RadialGradient(
+            colors: [color.opacity(dimmed ? 0 : 0.35), .black],
+            center: .center,
+            startRadius: 10,
+            endRadius: 150
+        )
+        .ignoresSafeArea()
+    }
+}
+
+private struct WorkingView: View {
+    let model: WorkoutModel
+    @Environment(\.isLuminanceReduced) private var dimmed
+
+    var body: some View {
+        VStack(spacing: 8) {
             Text("ПОДХОД \(model.currentSet)/\(model.totalSets)")
-                .font(.title3.weight(.bold))
-            Text("💪")
-                .font(.system(size: 44))
-            Text("тап — начать отдых")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(.title3.weight(.black))
+                .foregroundStyle(.green)
+            Image(systemName: "figure.strengthtraining.traditional")
+                .font(.system(size: 40))
+                .foregroundStyle(dimmed ? Color.green.opacity(0.5) : .green)
+            if !dimmed {
+                Text("тап — начать отдых")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(PhaseBackground(color: .green, dimmed: dimmed))
         .contentShape(Rectangle())
         .onTapGesture { model.finishSet() }
     }
@@ -81,34 +104,63 @@ private struct RestingView: View {
     let model: WorkoutModel
     let start: Date
     let end: Date
+    @Environment(\.isLuminanceReduced) private var dimmed
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text("дальше подход \(model.currentSet + 1)/\(model.totalSets)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            // Системный таймер: тикает даже в always-on, когда апп заморожен
-            Text(timerInterval: start...end, countsDown: true)
-                .font(.system(size: 52, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.orange)
-
-            ProgressView(timerInterval: start...end, countsDown: true) {
-                EmptyView()
-            } currentValueLabel: {
-                EmptyView()
+        ZStack {
+            // Кольцо «сгорает» к концу отдыха. Рисуем сами, поэтому только
+            // при активном аппе; в AOD остаются системные цифры
+            if !dimmed {
+                TimelineView(.periodic(from: start, by: 1)) { context in
+                    RestRing(progress: progress(at: context.date))
+                }
+                .padding(4)
             }
-            .tint(.orange)
-            .padding(.horizontal)
-
-            Text("тап — пропустить")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                // Системный таймер: тикает даже в always-on, когда апп заморожен
+                Text(timerInterval: start...end, countsDown: true)
+                    .font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.orange)
+                Text("подход \(model.currentSet + 1)/\(model.totalSets)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if !dimmed {
+                    Text("тап — скип")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 2)
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(PhaseBackground(color: .orange, dimmed: dimmed))
         .contentShape(Rectangle())
         .onTapGesture { model.skipRest() }
+    }
+
+    private func progress(at date: Date) -> Double {
+        let total = end.timeIntervalSince(start)
+        guard total > 0 else { return 1 }
+        return min(1, max(0, date.timeIntervalSince(start) / total))
+    }
+}
+
+private struct RestRing: View {
+    let progress: Double
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.orange.opacity(0.2), lineWidth: 6)
+            Circle()
+                .trim(from: 0, to: 1 - progress)
+                .stroke(Color.orange, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.linear(duration: 1), value: progress)
+        }
+        .aspectRatio(1, contentMode: .fit)
     }
 }
 
@@ -129,6 +181,7 @@ private struct FinishedView: View {
             Button("Завершить", action: onExit)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(PhaseBackground(color: .green, dimmed: false))
     }
 
     private var setsLabel: String {

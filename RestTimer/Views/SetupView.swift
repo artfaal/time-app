@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 struct SetupView: View {
     @AppStorage("totalSets") private var totalSets = 4
@@ -39,6 +40,7 @@ struct SetupView: View {
                 )
 
                 Button {
+                    WKInterfaceDevice.current().play(.click)
                     onStart(totalSets, TimeInterval(restSeconds))
                 } label: {
                     Text("СТАРТ")

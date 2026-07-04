@@ -32,6 +32,7 @@ final class WorkoutModel {
             NotificationManager.shared.cancelAll()
             playHaptics(.success, count: 2, gap: .seconds(1))
         } else {
+            WKInterfaceDevice.current().play(.click)
             let start = Date()
             let end = start.addingTimeInterval(restDuration)
             phase = .resting(start: start, end: end)
@@ -44,6 +45,7 @@ final class WorkoutModel {
     // Тап на экране отдыха: скип
     func skipRest() {
         guard case .resting = phase else { return }
+        WKInterfaceDevice.current().play(.click)
         NotificationManager.shared.cancelAll()
         cancelHaptics()
         startNextSet()
