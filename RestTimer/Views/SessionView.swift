@@ -7,25 +7,42 @@ struct SessionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showExitDialog = false
 
-    private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-
     var body: some View {
         content
-            .onReceive(timer) { _ in model.tick() }
+            // Дедлайны отдыха вместо поллинга: пока апп активен, просыпаемся
+            // ровно в end-10 и end. Пока апп спит, таск не работает —
+            // вибрируют уведомления, а состояние догоняет catchUp
+            .task(id: model.phase) {
+                guard case .resting(_, let end) = model.phase else { return }
+                do {
+                    let untilWarning = end.timeIntervalSinceNow - 10
+                    if untilWarning > 0 {
+                        try await Task.sleep(for: .seconds(untilWarning))
+                        model.restDeadlineTick()
+                    }
+                    try await Task.sleep(for: .seconds(max(end.timeIntervalSinceNow, 0)))
+                    model.restDeadlineTick()
+                } catch {
+                    // Фаза сменилась (скип/выход) — таск отменён, ничего не делаем
+                }
+            }
             .onChange(of: scenePhase) { _, newPhase in
                 // После сна догоняем состояние по фактическому времени
-                if newPhase == .active { model.tick() }
+                if newPhase == .active { model.catchUp() }
             }
             .onLongPressGesture(minimumDuration: 0.8) {
                 showExitDialog = true
             }
             .confirmationDialog("Закончить тренировку?", isPresented: $showExitDialog) {
-                Button("Закончить", role: .destructive) {
-                    model.abort()
-                    onExit()
-                }
+                Button("Закончить", role: .destructive) { endSession() }
                 Button("Продолжить", role: .cancel) {}
             }
+    }
+
+    // Единая точка выхода: гасит уведомления и недоигранные вибрации
+    private func endSession() {
+        model.abort()
+        onExit()
     }
 
     @ViewBuilder
@@ -36,7 +53,7 @@ struct SessionView: View {
         case .resting(let start, let end):
             RestingView(model: model, start: start, end: end)
         case .finished:
-            FinishedView(totalSets: model.totalSets, onExit: onExit)
+            FinishedView(totalSets: model.totalSets, onExit: endSession)
         }
     }
 }

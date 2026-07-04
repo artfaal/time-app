@@ -3,6 +3,7 @@ import SwiftUI
 struct SetupView: View {
     @AppStorage("totalSets") private var totalSets = 4
     @AppStorage("restSeconds") private var restSeconds = 120
+    @State private var notificationsDenied = false
 
     let onStart: (Int, TimeInterval) -> Void
 
@@ -38,10 +39,20 @@ struct SetupView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.green)
+
+                if notificationsDenied {
+                    Text("Уведомления запрещены — при опущенной руке вибрации не будет. Включи их для Rest в настройках часов.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                }
             }
             .padding(.top, 4)
         }
         .navigationTitle("Rest")
+        .task {
+            notificationsDenied = await NotificationManager.shared.authorizationDenied()
+        }
     }
 
     static func timeString(_ seconds: Int) -> String {

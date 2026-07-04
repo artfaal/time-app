@@ -17,15 +17,22 @@ final class AppDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCent
     func applicationDidFinishLaunching() {
         UNUserNotificationCenter.current().delegate = self
         NotificationManager.shared.requestAuthorization()
+        // Процесс могли убить посреди отдыха — гасим уведомления мёртвой сессии
+        NotificationManager.shared.cancelAll()
     }
 
-    // Апп на экране и активен — вибрируем сами через WKInterfaceDevice,
-    // баннер уведомления не показываем
+    // Пока апп действительно активен, вибрируем сами через WKInterfaceDevice —
+    // баннер уведомления глушим. Но в always-on апп frontmost и НЕ активен:
+    // willPresent всё равно вызывается, и глушить тут нельзя — системная
+    // вибрация уведомления в этот момент единственная.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        []
+        let isActive = await MainActor.run {
+            WKApplication.shared().applicationState == .active
+        }
+        return isActive ? [] : [.banner, .sound]
     }
 }
 

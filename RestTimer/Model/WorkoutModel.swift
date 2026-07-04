@@ -17,6 +17,7 @@ final class WorkoutModel {
 
     // Предупреждение за 10 сек играем один раз за отдых
     private var warningPlayed = false
+    private var hapticsTask: Task<Void, Never>?
 
     init(totalSets: Int, restDuration: TimeInterval) {
         self.totalSets = totalSets
@@ -29,12 +30,13 @@ final class WorkoutModel {
         if currentSet >= totalSets {
             phase = .finished
             NotificationManager.shared.cancelAll()
-            playFinishHaptics()
+            playHaptics(.success, count: 2, gap: .seconds(1))
         } else {
             let start = Date()
             let end = start.addingTimeInterval(restDuration)
             phase = .resting(start: start, end: end)
             warningPlayed = false
+            cancelHaptics()
             NotificationManager.shared.scheduleRestEnd(at: end)
         }
     }
@@ -43,34 +45,48 @@ final class WorkoutModel {
     func skipRest() {
         guard case .resting = phase else { return }
         NotificationManager.shared.cancelAll()
+        cancelHaptics()
         startNextSet()
     }
 
     func abort() {
         NotificationManager.shared.cancelAll()
+        cancelHaptics()
     }
 
-    // Тик от UI-таймера. Работает только пока апп активен;
-    // после сна догоняет состояние по endDate.
-    func tick(now: Date = Date()) {
+    // Дедлайн из SessionView: срабатывает только пока апп активен,
+    // в моменты end-10 и end. Вибрируем сами — delegate в активном
+    // состоянии глушит дубли-уведомления.
+    func restDeadlineTick(now: Date = Date()) {
         guard case .resting(_, let end) = phase else { return }
         let remaining = end.timeIntervalSince(now)
-
-        if remaining <= 10, remaining > 0.5, !warningPlayed {
+        if remaining <= 0 {
+            // Дедлайн мог «доспать» после разморозки раньше, чем придёт
+            // catchUp: если ноль прошёл давно, уведомления уже отвибрировали
+            finishRest(playHaptics: remaining > -1.0)
+        } else if remaining <= 10, !warningPlayed {
             warningPlayed = true
             WKInterfaceDevice.current().play(.notification)
         }
+    }
 
+    // Возврат сцены в .active: пока апп спал, границы могли пройти без него —
+    // системные уведомления уже отвибрировали, догоняем состояние молча
+    func catchUp(now: Date = Date()) {
+        guard case .resting(_, let end) = phase else { return }
+        let remaining = end.timeIntervalSince(now)
         if remaining <= 0 {
-            // Если ноль пересекли только что — апп был активен, уведомления
-            // не показывались (delegate их гасит), вибрируем сами.
-            // Если проснулись сильно позже — уже отвибрировали уведомления, молчим.
-            let justCrossedZero = remaining > -1.5
-            NotificationManager.shared.cancelAll()
-            startNextSet()
-            if justCrossedZero {
-                playRestEndHaptics()
-            }
+            finishRest(playHaptics: false)
+        } else if remaining <= 10 {
+            warningPlayed = true
+        }
+    }
+
+    private func finishRest(playHaptics shouldPlay: Bool) {
+        NotificationManager.shared.cancelAll()
+        startNextSet()
+        if shouldPlay {
+            playHaptics(.notification, count: 3, gap: .seconds(2))
         }
     }
 
@@ -79,23 +95,23 @@ final class WorkoutModel {
         phase = .working
     }
 
-    // Три сильных вибрации с интервалом ~2 сек
-    private func playRestEndHaptics() {
-        Task { @MainActor in
-            for i in 0..<3 {
-                WKInterfaceDevice.current().play(.notification)
-                if i < 2 {
-                    try? await Task.sleep(for: .seconds(2))
+    // Серия вибраций отменяемой задачей: скип, новый подход или выход
+    // обрывают недоигранные buzzes
+    private func playHaptics(_ type: WKHapticType, count: Int, gap: Duration) {
+        hapticsTask?.cancel()
+        hapticsTask = Task { @MainActor in
+            for index in 0..<count {
+                guard !Task.isCancelled else { return }
+                WKInterfaceDevice.current().play(type)
+                if index < count - 1 {
+                    do { try await Task.sleep(for: gap) } catch { return }
                 }
             }
         }
     }
 
-    private func playFinishHaptics() {
-        Task { @MainActor in
-            WKInterfaceDevice.current().play(.success)
-            try? await Task.sleep(for: .seconds(1))
-            WKInterfaceDevice.current().play(.success)
-        }
+    private func cancelHaptics() {
+        hapticsTask?.cancel()
+        hapticsTask = nil
     }
 }

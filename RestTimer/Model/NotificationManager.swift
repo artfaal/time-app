@@ -7,12 +7,18 @@ final class NotificationManager {
     static let shared = NotificationManager()
 
     private let center = UNUserNotificationCenter.current()
-    private let allIDs = ["rest-warning", "rest-end-1", "rest-end-2", "rest-end-3"]
 
     private init() {}
 
     func requestAuthorization() {
         center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    // Разрешение могли не дать или отозвать — тогда вибрации при опущенной
+    // руке не будет вовсе; SetupView показывает предупреждение
+    func authorizationDenied() async -> Bool {
+        let settings = await center.notificationSettings()
+        return settings.authorizationStatus == .denied
     }
 
     // Предупреждение за 10 сек + серия из трёх в конце отдыха
@@ -36,9 +42,11 @@ final class NotificationManager {
         }
     }
 
+    // Апп не шлёт никаких других уведомлений, поэтому сносим всё своё
+    // целиком — без ручного списка идентификаторов
     func cancelAll() {
-        center.removePendingNotificationRequests(withIdentifiers: allIDs)
-        center.removeDeliveredNotifications(withIdentifiers: allIDs)
+        center.removeAllPendingNotificationRequests()
+        center.removeAllDeliveredNotifications()
     }
 
     private func schedule(id: String, title: String, body: String, fireIn interval: TimeInterval) {
