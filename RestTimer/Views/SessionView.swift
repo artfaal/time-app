@@ -34,12 +34,7 @@ struct SessionView: View {
             .onLongPressGesture(minimumDuration: 0.8) {
                 showExitDialog = true
             }
-            .confirmationDialog("Тренировка", isPresented: $showExitDialog) {
-                Button("Заблокировать экран") {
-                    // Water Lock: экран не реагирует на касания,
-                    // разблокировка — нажать и удерживать Digital Crown
-                    WKInterfaceDevice.current().enableWaterLock()
-                }
+            .confirmationDialog("Закончить тренировку?", isPresented: $showExitDialog) {
                 Button("Закончить", role: .destructive) { endSession() }
                 Button("Продолжить", role: .cancel) {}
             }
@@ -131,6 +126,7 @@ private struct WorkingView: View {
                 Image(systemName: "figure.strengthtraining.traditional")
                     .font(.system(size: 44))
                     .foregroundStyle(dimmed ? Color.green.opacity(0.5) : .green)
+                    .symbolEffect(.breathe)
                     .padding(.top, 10)
                 Spacer()
                 Text("начать отдых")
@@ -264,11 +260,15 @@ private struct FinishedView: View {
     let totalSets: Int
     let onExit: () -> Void
 
+    @State private var celebrated = false
+
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 44))
                 .foregroundStyle(.green)
+                .symbolEffect(.bounce, value: celebrated)
+                .onAppear { celebrated = true }
             Text("Готово!")
                 .font(.title3.weight(.bold))
             Text(setsLabel)
