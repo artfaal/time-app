@@ -81,8 +81,14 @@ xcodebuild -project RestTimer.xcodeproj -scheme RestTimer \
 ## Конвенции UI (watchOS-специфика, выстрадано)
 
 - Тикающие в AOD элементы — только системные (`Text(timerInterval:)`).
-  Самонарисованное (полоса `RestBar` через `TimelineView`) прячется при
-  `isLuminanceReduced`.
+  Самонарисованное (кольцо отдыха `PhaseRing` из `Views/Theme.swift`, рисуется
+  через `TimelineView`) прячется при `isLuminanceReduced`.
+- Дизайн-токены (цвета фаз, фоновые градиенты) и геометрия колец — в
+  `Views/Theme.swift` (направление 1e «Радиальный / арка»). Кольца выведены из
+  SVG-эталона хэндоффа (viewBox 200, r=88): диаметр = 0.88 × размер, толщина
+  масштабируется от ширины экрана. Эталонные ассеты —
+  `/Users/artfaal/Downloads/handoff-RestTimer-1e`; числа не выдумывать, сверять
+  с эталоном.
 - Экраны сессии обёрнуты в полноэкранные `Button` ради Double Tap
   (`.handGestureShortcut(.primaryAction)`, один на экран). Побочка: внешние
   жесты поверх кнопок вешать через `.simultaneousGesture` (long-press) или

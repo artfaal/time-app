@@ -22,41 +22,38 @@ struct SetupView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 6) {
-                valueCard(
-                    title: "ПОДХОДЫ",
-                    display: "\(totalSets)",
-                    field: .sets,
-                    value: $setsValue,
-                    range: 1...10
-                )
-
-                valueCard(
-                    title: "ОТДЫХ",
-                    display: Self.timeString(restSeconds),
-                    field: .rest,
-                    value: $restSteps,
-                    range: 2...20
-                )
+            VStack(spacing: 13) {
+                // Два круглых циферблата (1e): зелёная обводка = фокус Crown,
+                // тап переносит фокус. Кнопок −/+ нет — только колесо
+                HStack(spacing: 13) {
+                    dial(
+                        title: "ПОДХОДЫ",
+                        display: "\(totalSets)",
+                        fontSize: 26,
+                        field: .sets,
+                        value: $setsValue,
+                        range: 1...10
+                    )
+                    dial(
+                        title: "ОТДЫХ",
+                        display: Self.timeString(restSeconds),
+                        fontSize: 20,
+                        field: .rest,
+                        value: $restSteps,
+                        range: 2...20
+                    )
+                }
 
                 Button {
                     WKInterfaceDevice.current().play(.click)
                     onStart(totalSets, TimeInterval(restSeconds))
                 } label: {
                     Text("СТАРТ")
-                        .font(.system(.headline, design: .rounded).weight(.black))
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .tracking(0.5)
                         .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule().fill(
-                                LinearGradient(
-                                    colors: [.green, Color(red: 0.35, green: 0.9, blue: 0.55)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                        )
+                        .frame(width: Theme.screenWidth * (262.0 / 410.0), height: 35)
+                        .background(Capsule().fill(.white))
                 }
                 .buttonStyle(.plain)
 
@@ -74,10 +71,14 @@ struct SetupView: View {
                         .multilineTextAlignment(.center)
                 }
             }
+            // Сдвиг до эталонной вертикали (циферблаты у центра экрана);
+            // пресеты при этом уходят под фолд — доступны скроллом
+            .padding(.top, 28)
         }
         .scrollIndicators(.hidden)
         .contentMargins(.horizontal, 2, for: .scrollContent)
         .contentMargins(.vertical, 2, for: .scrollContent)
+        .background(Theme.bgSetup.ignoresSafeArea())
         .onAppear {
             setsValue = Double(totalSets)
             restSteps = Double(restSeconds / 15)
@@ -94,52 +95,36 @@ struct SetupView: View {
         }
     }
 
-    // Карточка значения: подпись, крупное число, «минус/плюс».
-    // Фокус (подсветка) назначает Digital Crown на это значение,
-    // тап по карточке переносит фокус. Один щелчок колеса = один шаг.
+    // Круглый циферблат: значение внутри кольца-обводки, подпись под ним.
+    // Фокус (зелёная обводка) назначает Digital Crown на это значение,
+    // тап по циферблату переносит фокус. Один щелчок колеса = один шаг
     @ViewBuilder
-    private func valueCard(
+    private func dial(
         title: String,
         display: String,
+        fontSize: CGFloat,
         field: Field,
         value: Binding<Double>,
         range: ClosedRange<Double>
     ) -> some View {
         let isFocused = focusedField == field
 
-        VStack(spacing: 0) {
-            Text(title)
-                .font(.system(.caption2, design: .rounded).weight(.semibold))
-                .tracking(1.2)
-                .foregroundStyle(isFocused ? Color.green : .secondary)
-            HStack {
-                roundButton("minus") {
-                    value.wrappedValue = max(range.lowerBound, value.wrappedValue - 1)
-                    focusedField = field
-                }
-                Spacer()
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .strokeBorder(isFocused ? Theme.work : Theme.dialInactive, lineWidth: 2)
                 Text(display)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(.system(size: fontSize, weight: .black, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .animation(.easeOut(duration: 0.12), value: display)
-                Spacer()
-                roundButton("plus") {
-                    value.wrappedValue = min(range.upperBound, value.wrappedValue + 1)
-                    focusedField = field
-                }
             }
+            .frame(width: Theme.setupDialSide, height: Theme.setupDialSide)
+            Text(title)
+                .font(.system(size: 8, weight: .heavy, design: .rounded))
+                .tracking(1.1)
+                .foregroundStyle(.white.opacity(0.45))
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(isFocused ? 0.12 : 0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(isFocused ? Color.green.opacity(0.7) : .clear, lineWidth: 1.5)
-        )
         .animation(.snappy(duration: 0.2), value: isFocused)
         .contentShape(Rectangle())
         .onTapGesture { focusedField = field }
@@ -173,16 +158,6 @@ struct SetupView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
                 .background(Capsule().fill(Color.white.opacity(0.10)))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func roundButton(_ systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 30, height: 30)
-                .background(Circle().fill(.white.opacity(0.12)))
         }
         .buttonStyle(.plain)
     }

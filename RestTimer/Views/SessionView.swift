@@ -59,55 +59,17 @@ struct SessionView: View {
             switch model.phase {
             case .working:
                 WorkingView(model: model)
-                    .transition(phaseTransition)
+                    .transition(.opacity)
             case .resting(let start, let end):
                 RestingView(model: model, start: start, end: end)
-                    .transition(phaseTransition)
+                    .transition(.opacity)
             case .finished:
                 FinishedView(totalSets: model.totalSets, onExit: endSession)
-                    .transition(phaseTransition)
+                    .transition(.opacity)
             }
         }
-        .animation(.spring(duration: 0.35), value: model.phase)
-    }
-
-    private var phaseTransition: AnyTransition {
-        .opacity.combined(with: .scale(scale: 0.92))
-    }
-}
-
-// Мягкий градиент в цвет фазы: работа — зелёный, отдых — оранжевый.
-// Фазу видно боковым зрением, не читая текст. В AOD гаснет.
-private struct PhaseBackground: View {
-    let color: Color
-    let dimmed: Bool
-
-    var body: some View {
-        RadialGradient(
-            colors: [color.opacity(dimmed ? 0 : 0.35), .black],
-            center: .center,
-            startRadius: 10,
-            endRadius: 150
-        )
-        .ignoresSafeArea()
-    }
-}
-
-// Прогресс тренировки: капсула на каждый подход, сделанные заполнены
-private struct SetSegments: View {
-    let total: Int
-    let done: Int
-    let tint: Color
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<total, id: \.self) { index in
-                Capsule()
-                    .fill(index < done ? tint : tint.opacity(0.25))
-                    .frame(height: 5)
-            }
-        }
-        .animation(.spring(duration: 0.4), value: done)
+        // Кросс-фейд фаз ~0.4 с (спека 1e): фон и кольцо перетекают
+        .animation(.easeOut(duration: 0.4), value: model.phase)
     }
 }
 
@@ -121,34 +83,54 @@ private struct WorkingView: View {
         Button {
             model.finishSet()
         } label: {
-            VStack(spacing: 0) {
-                SetSegments(total: model.totalSets, done: model.currentSet - 1, tint: .green)
-                    .opacity(dimmed ? 0.5 : 1)
-                Spacer()
-                Text("ПОДХОД \(model.currentSet)/\(model.totalSets)")
-                    .font(.title2.weight(.black))
-                    .foregroundStyle(.green)
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .font(.system(size: 44))
-                    .foregroundStyle(dimmed ? Color.green.opacity(0.5) : .green)
-                    .symbolEffect(.breathe)
-                    .padding(.top, 10)
-                Spacer()
-                Text("начать отдых")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .opacity(dimmed ? 0 : 1)
+            ZStack {
+                // Кольцо-прогресс тренировки: заполнено currentSet/totalSets
+                // (эталон: 2/5 → 40%). Рисуем сами — в AOD гасим
+                if !dimmed {
+                    PhaseRing(
+                        progress: Double(model.currentSet) / Double(model.totalSets),
+                        color: Theme.work,
+                        lineWidth: Theme.workRingWidth
+                    )
+                    .frame(width: Theme.workRingSide, height: Theme.workRingSide)
+                }
+                VStack(spacing: 2) {
+                    Text("ПОДХОД")
+                        .font(.system(size: 8, weight: .heavy, design: .rounded))
+                        .tracking(1.6)
+                        .foregroundStyle(.white.opacity(0.4))
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text("\(model.currentSet)")
+                            .font(.system(size: 56, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("/\(model.totalSets)")
+                            .font(.system(size: 33, weight: .black, design: .rounded))
+                            .foregroundStyle(Theme.work.opacity(0.6))
+                    }
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.2), value: model.currentSet)
+                }
+                if !dimmed {
+                    VStack {
+                        Spacer()
+                        Text("двойной тап — готово")
+                            .font(.system(size: 8, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.42))
+                            .padding(.bottom, 17)
+                    }
+                }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .handGestureShortcut(.primaryAction)
-        .background(PhaseBackground(color: .green, dimmed: dimmed))
+        .background(
+            RadialPhaseBackground(inner: Theme.bgWorkInner, outer: Theme.bgWorkOuter, dimmed: dimmed)
+        )
+        // Эталон центрует кольцо на ПОЛНОМ экране, не в safe area
+        .ignoresSafeArea()
         // Свайп: поправить номер текущего подхода (влево — вперёд,
         // вправо — назад), если часть подходов сделана вне аппа.
         // highPriority — чтобы свайп не срабатывал заодно как тап по кнопке
@@ -177,69 +159,73 @@ private struct RestingView: View {
     @State private var crownAnchor = 0.0
     @State private var pendingSteps = 0
     @State private var applyTask: Task<Void, Never>?
+    // Прорисовка кольца от 0 до текущего remaining при входе в отдых
+    @State private var ringAppeared = false
 
     var body: some View {
         // Кнопка на весь экран: тап и системный Double Tap — скип отдыха
         Button {
             model.skipRest()
         } label: {
-            // ZStack: цифры строго по центру экрана, сегменты и полоса —
-            // по краям, независимо друг от друга
             ZStack {
-                VStack(spacing: 4) {
-                    SetSegments(total: model.totalSets, done: model.currentSet, tint: .orange)
-                        .opacity(dimmed ? 0.5 : 1)
-                    Text("подход \(model.currentSet + 1)/\(model.totalSets)")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Spacer()
+                // Кольцо «сгорает» синхронно с таймером. Рисуем сами
+                // (TimelineView), поэтому в AOD гасим — остаются системные цифры
+                if !dimmed {
+                    TimelineView(.animation(minimumInterval: 0.1)) { context in
+                        PhaseRing(
+                            progress: ringAppeared ? progress(at: context.date) : 0,
+                            color: Theme.rest,
+                            lineWidth: Theme.restRingWidth,
+                            glow: true
+                        )
+                        // Последние 10 сек кольцо пульсирует (предупреждение)
+                        .opacity(warningPulse(at: context.date))
+                    }
+                    .frame(width: Theme.restRingSide, height: Theme.restRingSide)
                 }
-                VStack(spacing: 0) {
+                VStack(spacing: 2) {
+                    if !dimmed {
+                        Text("ОТДЫХ")
+                            .font(.system(size: 8, weight: .heavy, design: .rounded))
+                            .tracking(1.8)
+                            .foregroundStyle(Theme.rest)
+                    }
                     // Системный таймер: тикает даже в always-on, когда апп заморожен
                     Text(timerInterval: start...end, countsDown: true)
-                        .font(.system(size: 68, weight: .semibold, design: .rounded))
+                        .font(.system(size: 50, weight: .black, design: .rounded))
+                        .tracking(-1)
                         .monospacedDigit()
                         .multilineTextAlignment(.center)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.white)
+                }
+                // Превью накопленной колесом дельты: под цифрами, внутри кольца,
+                // без сдвига самого таймера
+                .overlay {
                     if pendingSteps != 0 {
-                        // Превью накопленной колесом дельты до применения
                         Text(pendingLabel)
-                            .font(.system(.headline, design: .rounded).weight(.bold))
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
                             .monospacedDigit()
-                            .foregroundStyle(.orange.opacity(0.8))
+                            .foregroundStyle(Theme.rest.opacity(0.85))
+                            .offset(y: 44)
                             .transition(.opacity)
                     }
                 }
-                // С дельтой блок подрастает вниз — слегка приподнимаем его,
-                // чтобы дельта не ныряла под полосу прогресса
-                .offset(y: pendingSteps == 0 ? 0 : -10)
-                .animation(.spring(duration: 0.4, bounce: 0.1), value: pendingSteps)
-                if !dimmed {
-                    VStack {
-                        Spacer()
-                        // Полоса отдыха «сгорает» к нулю. Рисуем сами, поэтому
-                        // только при активном аппе; в AOD остаются системные цифры
-                        TimelineView(.periodic(from: start, by: 1)) { context in
-                            RestBar(progress: progress(at: context.date))
-                        }
-                        .frame(height: 8)
-                        Text("пропустить")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 2)
-                    }
-                }
+                .animation(.spring(duration: 0.3), value: pendingSteps != 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .handGestureShortcut(.primaryAction)
-        .background(PhaseBackground(color: .orange, dimmed: dimmed))
+        .background(
+            RadialPhaseBackground(inner: Theme.bgRestInner, outer: Theme.bgRestOuter, dimmed: dimmed)
+        )
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.4)) { ringAppeared = true }
+        }
         .focusable(true)
         .digitalCrownRotation(
             $crownSteps,
@@ -278,28 +264,19 @@ private struct RestingView: View {
         return sign + SetupView.timeString(seconds)
     }
 
+    // Кольцо отдыха убывает: remaining/total → 0
     private func progress(at date: Date) -> Double {
         let total = end.timeIntervalSince(start)
-        guard total > 0 else { return 1 }
-        return min(1, max(0, date.timeIntervalSince(start) / total))
+        guard total > 0 else { return 0 }
+        return min(1, max(0, end.timeIntervalSince(date) / total))
     }
-}
 
-private struct RestBar: View {
-    let progress: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.orange.opacity(0.2))
-                Capsule()
-                    .fill(Color.orange)
-                    .frame(width: max(8, geo.size.width * (1 - progress)))
-                    .animation(.linear(duration: 1), value: progress)
-            }
-        }
-        .frame(height: 8)
+    // Пульс 0.55↔1 (~1.6 с) в последние 10 сек отдыха
+    private func warningPulse(at date: Date) -> Double {
+        let remaining = end.timeIntervalSince(date)
+        guard remaining > 0, remaining <= 10 else { return 1 }
+        let t = date.timeIntervalSinceReferenceDate
+        return 0.775 + 0.225 * cos(t * 2 * .pi / 1.6)
     }
 }
 
@@ -307,25 +284,36 @@ private struct FinishedView: View {
     let totalSets: Int
     let onExit: () -> Void
 
-    @State private var celebrated = false
+    @State private var pulsing = false
 
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(.green)
-                .symbolEffect(.bounce, value: celebrated)
-                .onAppear { celebrated = true }
-            Text("Готово!")
-                .font(.title3.weight(.bold))
-            Text(setsLabel)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Button("Завершить", action: onExit)
-                .handGestureShortcut(.primaryAction)
+        // Кнопка на весь экран: тап и Double Tap завершают
+        Button(action: onExit) {
+            ZStack {
+                PhaseRing(progress: 1, color: Theme.work, lineWidth: Theme.workRingWidth, glow: true)
+                    .frame(width: Theme.workRingSide, height: Theme.workRingSide)
+                VStack(spacing: 6) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Theme.work)
+                    Text(setsLabel)
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                }
+                // Idle-пульс галочки: 1→1.09→1, цикл ~2 с
+                .scaleEffect(pulsing ? 1.09 : 1.0)
+                .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: pulsing)
+                .onAppear { pulsing = true }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(PhaseBackground(color: .green, dimmed: false))
+        .buttonStyle(.plain)
+        .handGestureShortcut(.primaryAction)
+        .background(
+            RadialPhaseBackground(inner: Theme.bgWorkInner, outer: Theme.bgWorkOuter, dimmed: false)
+        )
+        .ignoresSafeArea()
     }
 
     private var setsLabel: String {
