@@ -41,7 +41,7 @@ struct SessionView: View {
                         showExitDialog = true
                     }
             )
-            .confirmationDialog("Закончить тренировку?", isPresented: $showExitDialog) {
+            .confirmationDialog("Закончить упражнение?", isPresented: $showExitDialog) {
                 Button("Закончить", role: .destructive) { endSession() }
                 Button("Продолжить", role: .cancel) {}
             }
@@ -170,8 +170,12 @@ private struct RestingView: View {
     @Environment(\.isLuminanceReduced) private var dimmed
 
     // Колесо во время отдыха: один щелчок = ±15 сек к текущему отдыху.
+    // Шаги копятся и применяются с задержкой после остановки вращения —
+    // защита от случайного задевания колеса.
     // @State живёт в пределах одного отдыха (view пересоздаётся на фазу)
     @State private var crownSteps = 0.0
+    @State private var pendingSteps = 0
+    @State private var applyTask: Task<Void, Never>?
 
     var body: some View {
         // Кнопка на весь экран: тап и системный Double Tap — скип отдыха
@@ -189,14 +193,24 @@ private struct RestingView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
-                // Системный таймер: тикает даже в always-on, когда апп заморожен
-                Text(timerInterval: start...end, countsDown: true)
-                    .font(.system(size: 68, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .foregroundStyle(.orange)
+                VStack(spacing: 0) {
+                    // Системный таймер: тикает даже в always-on, когда апп заморожен
+                    Text(timerInterval: start...end, countsDown: true)
+                        .font(.system(size: 68, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                        .foregroundStyle(.orange)
+                    if pendingSteps != 0 {
+                        // Превью накопленной колесом дельты до применения
+                        Text(pendingLabel)
+                            .font(.system(.headline, design: .rounded).weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.orange.opacity(0.8))
+                            .transition(.opacity)
+                    }
+                }
                 if !dimmed {
                     VStack {
                         Spacer()
@@ -227,15 +241,33 @@ private struct RestingView: View {
             from: -40,
             through: 40,
             by: 1,
-            sensitivity: .medium,
+            sensitivity: .low,
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
         .onChange(of: crownSteps) { oldValue, newValue in
             let delta = Int(newValue.rounded()) - Int(oldValue.rounded())
             guard delta != 0 else { return }
-            model.adjustRest(by: TimeInterval(delta * 15))
+            withAnimation(.easeOut(duration: 0.15)) {
+                pendingSteps += delta
+            }
+            // Применяем через паузу после последнего щелчка
+            applyTask?.cancel()
+            applyTask = Task {
+                try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled, pendingSteps != 0 else { return }
+                model.adjustRest(by: TimeInterval(pendingSteps * 15))
+                withAnimation(.easeOut(duration: 0.15)) {
+                    pendingSteps = 0
+                }
+            }
         }
+    }
+
+    private var pendingLabel: String {
+        let seconds = abs(pendingSteps) * 15
+        let sign = pendingSteps > 0 ? "+" : "−"
+        return sign + SetupView.timeString(seconds)
     }
 
     private func progress(at date: Date) -> Double {
