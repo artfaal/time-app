@@ -24,11 +24,11 @@ struct SetupView: View {
         VStack(spacing: 13) {
             // Два круглых циферблата (1e): зелёная обводка = фокус Crown,
             // тап переносит фокус. Кнопок −/+ нет — только колесо
-            HStack(spacing: 13) {
+            HStack(spacing: 12) {
                 dial(
                     title: "ПОДХОДЫ",
                     display: "\(totalSets)",
-                    fontSize: 26,
+                    fontSize: 32,
                     field: .sets,
                     value: $setsValue,
                     range: 1...10
@@ -36,7 +36,7 @@ struct SetupView: View {
                 dial(
                     title: "ОТДЫХ",
                     display: Self.timeString(restSeconds),
-                    fontSize: 20,
+                    fontSize: 25,
                     field: .rest,
                     value: $restSteps,
                     range: 2...20
@@ -48,10 +48,10 @@ struct SetupView: View {
                 onStart(totalSets, TimeInterval(restSeconds))
             } label: {
                 Text("СТАРТ")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .tracking(0.5)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .tracking(0.6)
                     .foregroundStyle(.black)
-                    .frame(width: Theme.screenWidth * (262.0 / 410.0), height: 35)
+                    .frame(width: Theme.screenWidth * 0.77, height: 42)
                     .background(Capsule().fill(.white))
             }
             .buttonStyle(.plain)
@@ -64,9 +64,9 @@ struct SetupView: View {
                     .padding(.horizontal, 8)
             }
         }
-        // Группа чуть ниже середины полного экрана — как в эталоне: сверху
-        // воздух под системные часы, СТАРТ ближе к низу (сверено по пикселям)
-        .offset(y: 24)
+        // Группа чуть ниже середины полного экрана: сверху воздух под
+        // системные часы, СТАРТ ближе к низу
+        .offset(y: 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.bgSetup)
         .ignoresSafeArea()
@@ -103,7 +103,7 @@ struct SetupView: View {
         VStack(spacing: 6) {
             ZStack {
                 Circle()
-                    .strokeBorder(isFocused ? Theme.work : Theme.dialInactive, lineWidth: 2)
+                    .strokeBorder(isFocused ? Theme.work : Theme.dialInactive, lineWidth: 2.5)
                 Text(display)
                     .font(.system(size: fontSize, weight: .black, design: .rounded))
                     .monospacedDigit()
@@ -112,8 +112,8 @@ struct SetupView: View {
             }
             .frame(width: Theme.setupDialSide, height: Theme.setupDialSide)
             Text(title)
-                .font(.system(size: 8, weight: .heavy, design: .rounded))
-                .tracking(1.1)
+                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .tracking(1.4)
                 .foregroundStyle(.white.opacity(0.45))
         }
         .animation(.snappy(duration: 0.2), value: isFocused)

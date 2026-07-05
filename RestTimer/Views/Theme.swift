@@ -18,14 +18,14 @@ enum Theme {
 
     static var screenWidth: CGFloat { WKInterfaceDevice.current().screenBounds.width }
 
-    // Геометрия колец из эталона (SVG viewBox 200, r=88, растянут до 330/340px):
-    // фактический диаметр окружности = 0.88 × размер SVG, толщина стенки
-    // масштабируется вместе с ним (10 и 12 в координатах viewBox)
-    static var workRingSide: CGFloat { screenWidth * (330.0 * 0.88 / 410.0) }   // 290px на Ultra 2
-    static var restRingSide: CGFloat { screenWidth * (340.0 * 0.88 / 410.0) }   // 299px
-    static var workRingWidth: CGFloat { screenWidth * (16.5 / 410.0) }          // 10/200 × 330
-    static var restRingWidth: CGFloat { screenWidth * (20.4 / 410.0) }          // 12/200 × 340
-    static var setupDialSide: CGFloat { screenWidth * (134.0 / 410.0) }
+    // Геометрия крупнее эталона (~×1.2): по просьбе пользователя экран Ultra
+    // используется на максимум — кольца почти во всю ширину, поля ужаты.
+    // Пропорции 1e (соотношение толщин, старт сверху и т.д.) сохранены
+    static var workRingSide: CGFloat { screenWidth * 0.86 }
+    static var restRingSide: CGFloat { screenWidth * 0.88 }
+    static var workRingWidth: CGFloat { screenWidth * (20.0 / 410.0) }
+    static var restRingWidth: CGFloat { screenWidth * (25.0 / 410.0) }
+    static var setupDialSide: CGFloat { screenWidth * 0.40 }
 }
 
 // Кольцо направления: старт сверху (12 часов), скруглённые концы,

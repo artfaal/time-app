@@ -96,15 +96,15 @@ private struct WorkingView: View {
                 }
                 VStack(spacing: 2) {
                     Text("ПОДХОД")
-                        .font(.system(size: 8, weight: .heavy, design: .rounded))
-                        .tracking(1.6)
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .tracking(2.0)
                         .foregroundStyle(.white.opacity(0.4))
                     HStack(alignment: .firstTextBaseline, spacing: 0) {
                         Text("\(model.currentSet)")
-                            .font(.system(size: 56, weight: .black, design: .rounded))
+                            .font(.system(size: 68, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
                         Text("/\(model.totalSets)")
-                            .font(.system(size: 33, weight: .black, design: .rounded))
+                            .font(.system(size: 40, weight: .black, design: .rounded))
                             .foregroundStyle(Theme.work.opacity(0.6))
                     }
                     .monospacedDigit()
@@ -115,9 +115,9 @@ private struct WorkingView: View {
                     VStack {
                         Spacer()
                         Text("двойной тап — готово")
-                            .font(.system(size: 8, weight: .heavy, design: .rounded))
+                            .font(.system(size: 10, weight: .heavy, design: .rounded))
                             .foregroundStyle(.white.opacity(0.42))
-                            .padding(.bottom, 17)
+                            .padding(.bottom, 10)
                     }
                 }
             }
@@ -186,14 +186,14 @@ private struct RestingView: View {
                 VStack(spacing: 2) {
                     if !dimmed {
                         Text("ОТДЫХ")
-                            .font(.system(size: 8, weight: .heavy, design: .rounded))
-                            .tracking(1.8)
+                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .tracking(2.2)
                             .foregroundStyle(Theme.rest)
                     }
                     // Системный таймер: тикает даже в always-on, когда апп заморожен
                     Text(timerInterval: start...end, countsDown: true)
-                        .font(.system(size: 50, weight: .black, design: .rounded))
-                        .tracking(-1)
+                        .font(.system(size: 60, weight: .black, design: .rounded))
+                        .tracking(-1.2)
                         .monospacedDigit()
                         .multilineTextAlignment(.center)
                         .minimumScaleFactor(0.6)
@@ -205,10 +205,10 @@ private struct RestingView: View {
                 .overlay {
                     if pendingSteps != 0 {
                         Text(pendingLabel)
-                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .font(.system(size: 17, weight: .heavy, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(Theme.rest.opacity(0.85))
-                            .offset(y: 44)
+                            .offset(y: 52)
                             .transition(.opacity)
                     }
                 }
@@ -292,12 +292,12 @@ private struct FinishedView: View {
             ZStack {
                 PhaseRing(progress: 1, color: Theme.work, lineWidth: Theme.workRingWidth, glow: true)
                     .frame(width: Theme.workRingSide, height: Theme.workRingSide)
-                VStack(spacing: 6) {
+                VStack(spacing: 7) {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(Theme.work)
                     Text(setsLabel)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(.system(size: 16, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
                 }
                 // Idle-пульс галочки: 1→1.09→1, цикл ~2 с
