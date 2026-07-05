@@ -31,9 +31,16 @@ struct SessionView: View {
                 // После сна догоняем состояние по фактическому времени
                 if newPhase == .active { model.catchUp() }
             }
-            .onLongPressGesture(minimumDuration: 0.8) {
-                showExitDialog = true
-            }
+            // simultaneousGesture, а не onLongPressGesture: экраны обёрнуты
+            // в кнопки на весь экран (Double Tap), и кнопка съедает
+            // обычный внешний long-press
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.8)
+                    .onEnded { _ in
+                        WKInterfaceDevice.current().play(.click)
+                        showExitDialog = true
+                    }
+            )
             .confirmationDialog("Закончить тренировку?", isPresented: $showExitDialog) {
                 Button("Закончить", role: .destructive) { endSession() }
                 Button("Продолжить", role: .cancel) {}
