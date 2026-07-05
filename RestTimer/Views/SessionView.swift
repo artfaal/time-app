@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 struct SessionView: View {
     let model: WorkoutModel
@@ -33,7 +34,12 @@ struct SessionView: View {
             .onLongPressGesture(minimumDuration: 0.8) {
                 showExitDialog = true
             }
-            .confirmationDialog("Закончить тренировку?", isPresented: $showExitDialog) {
+            .confirmationDialog("Тренировка", isPresented: $showExitDialog) {
+                Button("Заблокировать экран") {
+                    // Water Lock: экран не реагирует на касания,
+                    // разблокировка — кручением колеса
+                    WKInterfaceDevice.current().enableWaterLock()
+                }
                 Button("Закончить", role: .destructive) { endSession() }
                 Button("Продолжить", role: .cancel) {}
             }
@@ -108,34 +114,42 @@ private struct WorkingView: View {
     @Environment(\.isLuminanceReduced) private var dimmed
 
     var body: some View {
-        VStack(spacing: 0) {
-            SetSegments(total: model.totalSets, done: model.currentSet - 1, tint: .green)
-                .opacity(dimmed ? 0.5 : 1)
-            Spacer()
-            Text("ПОДХОД \(model.currentSet)/\(model.totalSets)")
-                .font(.title2.weight(.black))
-                .foregroundStyle(.green)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-            Image(systemName: "figure.strengthtraining.traditional")
-                .font(.system(size: 44))
-                .foregroundStyle(dimmed ? Color.green.opacity(0.5) : .green)
-                .padding(.top, 10)
-            Spacer()
-            Text("начать отдых")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .opacity(dimmed ? 0 : 1)
+        // Кнопка на весь экран: тап и системный Double Tap (сжать пальцы)
+        // заканчивают подход
+        Button {
+            model.finishSet()
+        } label: {
+            VStack(spacing: 0) {
+                SetSegments(total: model.totalSets, done: model.currentSet - 1, tint: .green)
+                    .opacity(dimmed ? 0.5 : 1)
+                Spacer()
+                Text("ПОДХОД \(model.currentSet)/\(model.totalSets)")
+                    .font(.title2.weight(.black))
+                    .foregroundStyle(.green)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .font(.system(size: 44))
+                    .foregroundStyle(dimmed ? Color.green.opacity(0.5) : .green)
+                    .padding(.top, 10)
+                Spacer()
+                Text("начать отдых")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .opacity(dimmed ? 0 : 1)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .buttonStyle(.plain)
+        .handGestureShortcut(.primaryAction)
         .background(PhaseBackground(color: .green, dimmed: dimmed))
-        .contentShape(Rectangle())
-        .onTapGesture { model.finishSet() }
         // Свайп: поправить номер текущего подхода (влево — вперёд,
-        // вправо — назад), если часть подходов сделана вне аппа
-        .gesture(
+        // вправо — назад), если часть подходов сделана вне аппа.
+        // highPriority — чтобы свайп не срабатывал заодно как тап по кнопке
+        .highPriorityGesture(
             DragGesture(minimumDistance: 25)
                 .onEnded { value in
                     let dx = value.translation.width
@@ -152,48 +166,73 @@ private struct RestingView: View {
     let end: Date
     @Environment(\.isLuminanceReduced) private var dimmed
 
+    // Колесо во время отдыха: один щелчок = ±15 сек к текущему отдыху.
+    // @State живёт в пределах одного отдыха (view пересоздаётся на фазу)
+    @State private var crownSteps = 0.0
+
     var body: some View {
-        // ZStack: цифры строго по центру экрана, сегменты и полоса —
-        // по краям, независимо друг от друга
-        ZStack {
-            VStack(spacing: 4) {
-                SetSegments(total: model.totalSets, done: model.currentSet, tint: .orange)
-                    .opacity(dimmed ? 0.5 : 1)
-                Text("подход \(model.currentSet + 1)/\(model.totalSets)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            // Системный таймер: тикает даже в always-on, когда апп заморожен
-            Text(timerInterval: start...end, countsDown: true)
-                .font(.system(size: 68, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .multilineTextAlignment(.center)
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-                .foregroundStyle(.orange)
-            if !dimmed {
-                VStack {
+        // Кнопка на весь экран: тап и системный Double Tap — скип отдыха
+        Button {
+            model.skipRest()
+        } label: {
+            // ZStack: цифры строго по центру экрана, сегменты и полоса —
+            // по краям, независимо друг от друга
+            ZStack {
+                VStack(spacing: 4) {
+                    SetSegments(total: model.totalSets, done: model.currentSet, tint: .orange)
+                        .opacity(dimmed ? 0.5 : 1)
+                    Text("подход \(model.currentSet + 1)/\(model.totalSets)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Spacer()
-                    // Полоса отдыха «сгорает» к нулю. Рисуем сами, поэтому
-                    // только при активном аппе; в AOD остаются системные цифры
-                    TimelineView(.periodic(from: start, by: 1)) { context in
-                        RestBar(progress: progress(at: context.date))
+                }
+                // Системный таймер: тикает даже в always-on, когда апп заморожен
+                Text(timerInterval: start...end, countsDown: true)
+                    .font(.system(size: 68, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .foregroundStyle(.orange)
+                if !dimmed {
+                    VStack {
+                        Spacer()
+                        // Полоса отдыха «сгорает» к нулю. Рисуем сами, поэтому
+                        // только при активном аппе; в AOD остаются системные цифры
+                        TimelineView(.periodic(from: start, by: 1)) { context in
+                            RestBar(progress: progress(at: context.date))
+                        }
+                        .frame(height: 8)
+                        Text("пропустить")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 2)
                     }
-                    .frame(height: 8)
-                    Text("пропустить")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 2)
                 }
             }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .buttonStyle(.plain)
+        .handGestureShortcut(.primaryAction)
         .background(PhaseBackground(color: .orange, dimmed: dimmed))
-        .contentShape(Rectangle())
-        .onTapGesture { model.skipRest() }
+        .focusable(true)
+        .digitalCrownRotation(
+            $crownSteps,
+            from: -40,
+            through: 40,
+            by: 1,
+            sensitivity: .medium,
+            isContinuous: false,
+            isHapticFeedbackEnabled: true
+        )
+        .onChange(of: crownSteps) { oldValue, newValue in
+            let delta = Int(newValue.rounded()) - Int(oldValue.rounded())
+            guard delta != 0 else { return }
+            model.adjustRest(by: TimeInterval(delta * 15))
+        }
     }
 
     private func progress(at date: Date) -> Double {
@@ -236,6 +275,7 @@ private struct FinishedView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button("Завершить", action: onExit)
+                .handGestureShortcut(.primaryAction)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PhaseBackground(color: .green, dimmed: false))

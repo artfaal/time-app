@@ -60,6 +60,13 @@ struct SetupView: View {
                 }
                 .buttonStyle(.plain)
 
+                // Пресеты: тап — применить и сразу стартовать
+                HStack(spacing: 4) {
+                    presetChip(sets: 4, seconds: 120)
+                    presetChip(sets: 4, seconds: 90)
+                    presetChip(sets: 5, seconds: 120)
+                }
+
                 if notificationsDenied {
                     Text("Уведомления запрещены — при опущенной руке вибрации не будет. Включи их для Rest в настройках часов.")
                         .font(.footnote)
@@ -147,6 +154,27 @@ struct SetupView: View {
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
+    }
+
+    private func presetChip(sets: Int, seconds: Int) -> some View {
+        Button {
+            WKInterfaceDevice.current().play(.click)
+            totalSets = sets
+            restSeconds = seconds
+            setsValue = Double(sets)
+            restSteps = Double(seconds / 15)
+            onStart(sets, TimeInterval(seconds))
+        } label: {
+            Text("\(sets)×\(Self.timeString(seconds))")
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(Color.white.opacity(0.10)))
+        }
+        .buttonStyle(.plain)
     }
 
     private func roundButton(_ systemName: String, action: @escaping () -> Void) -> some View {

@@ -52,6 +52,17 @@ final class WorkoutModel {
         WKInterfaceDevice.current().play(.click)
     }
 
+    // Колесо во время отдыха: подкрутить время текущего отдыха (±15 сек)
+    func adjustRest(by delta: TimeInterval) {
+        guard case .resting(let start, let end) = phase else { return }
+        let newEnd = max(Date().addingTimeInterval(5), end.addingTimeInterval(delta))
+        phase = .resting(start: start, end: newEnd)
+        // Предупреждение перевзводится, если до конца снова больше 10 сек
+        warningPlayed = newEnd.timeIntervalSinceNow <= 10
+        NotificationManager.shared.scheduleRestEnd(at: newEnd)
+        WKInterfaceDevice.current().play(.click)
+    }
+
     // Тап на экране отдыха: скип
     func skipRest() {
         guard case .resting = phase else { return }
@@ -78,7 +89,9 @@ final class WorkoutModel {
             finishRest(playHaptics: remaining > -1.0)
         } else if remaining <= 10, !warningPlayed {
             warningPlayed = true
-            WKInterfaceDevice.current().play(.notification)
+            // Паттерн предупреждения отличается от финального —
+            // различимо не глядя и не считая
+            WKInterfaceDevice.current().play(.directionUp)
         }
     }
 
