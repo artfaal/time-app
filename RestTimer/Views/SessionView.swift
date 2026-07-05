@@ -37,7 +37,7 @@ struct SessionView: View {
             .confirmationDialog("Тренировка", isPresented: $showExitDialog) {
                 Button("Заблокировать экран") {
                     // Water Lock: экран не реагирует на касания,
-                    // разблокировка — кручением колеса
+                    // разблокировка — нажать и удерживать Digital Crown
                     WKInterfaceDevice.current().enableWaterLock()
                 }
                 Button("Закончить", role: .destructive) { endSession() }
