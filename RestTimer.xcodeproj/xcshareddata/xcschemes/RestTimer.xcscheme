@@ -29,8 +29,6 @@
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
    </TestAction>
-   <!-- Дебаггер выключен: Run просто ставит и запускает апп,
-        без «Attaching to …» -->
    <LaunchAction
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = ""

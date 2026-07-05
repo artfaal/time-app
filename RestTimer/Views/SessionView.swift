@@ -211,6 +211,9 @@ private struct RestingView: View {
                             .transition(.opacity)
                     }
                 }
+                // С дельтой блок подрастает вниз — приподнимаем его,
+                // чтобы дельта не ныряла под полосу прогресса
+                .offset(y: pendingSteps == 0 ? 0 : -22)
                 if !dimmed {
                     VStack {
                         Spacer()
@@ -254,7 +257,7 @@ private struct RestingView: View {
             // Применяем через паузу после последнего щелчка
             applyTask?.cancel()
             applyTask = Task {
-                try? await Task.sleep(for: .milliseconds(800))
+                try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled, pendingSteps != 0 else { return }
                 model.adjustRest(by: TimeInterval(pendingSteps * 15))
                 withAnimation(.easeOut(duration: 0.15)) {
