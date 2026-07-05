@@ -214,7 +214,7 @@ private struct RestingView: View {
                 }
                 // С дельтой блок подрастает вниз — слегка приподнимаем его,
                 // чтобы дельта не ныряла под полосу прогресса
-                .offset(y: pendingSteps == 0 ? 0 : -12)
+                .offset(y: pendingSteps == 0 ? 0 : -10)
                 .animation(.spring(duration: 0.4, bounce: 0.1), value: pendingSteps)
                 if !dimmed {
                     VStack {
