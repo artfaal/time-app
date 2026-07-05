@@ -170,10 +170,11 @@ private struct RestingView: View {
     @Environment(\.isLuminanceReduced) private var dimmed
 
     // Колесо во время отдыха: один щелчок = ±15 сек к текущему отдыху.
-    // Шаги копятся и применяются с задержкой после остановки вращения —
-    // защита от случайного задевания колеса.
+    // Двойная защита от случайного задевания: мёртвая зона ~1.5 щелчка
+    // до первой дельты + пауза 0.8 сек перед применением.
     // @State живёт в пределах одного отдыха (view пересоздаётся на фазу)
     @State private var crownSteps = 0.0
+    @State private var crownAnchor = 0.0
     @State private var pendingSteps = 0
     @State private var applyTask: Task<Void, Never>?
 
@@ -211,9 +212,10 @@ private struct RestingView: View {
                             .transition(.opacity)
                     }
                 }
-                // С дельтой блок подрастает вниз — приподнимаем его,
+                // С дельтой блок подрастает вниз — слегка приподнимаем его,
                 // чтобы дельта не ныряла под полосу прогресса
-                .offset(y: pendingSteps == 0 ? 0 : -22)
+                .offset(y: pendingSteps == 0 ? 0 : -12)
+                .animation(.spring(duration: 0.4, bounce: 0.1), value: pendingSteps)
                 if !dimmed {
                     VStack {
                         Spacer()
@@ -248,21 +250,24 @@ private struct RestingView: View {
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
-        .onChange(of: crownSteps) { oldValue, newValue in
-            let delta = Int(newValue.rounded()) - Int(oldValue.rounded())
-            guard delta != 0 else { return }
-            withAnimation(.easeOut(duration: 0.15)) {
-                pendingSteps += delta
-            }
-            // Применяем через паузу после последнего щелчка
+        .onChange(of: crownSteps) { _, newValue in
+            let raw = newValue - crownAnchor
+            // Мёртвая зона: пока не накрутил ~1.5 щелчка от точки покоя,
+            // дельта не появляется вовсе
+            if pendingSteps == 0, abs(raw) < 1.5 { return }
+            let effective = raw > 0 ? max(0, raw - 1.5) : min(0, raw + 1.5)
+            let steps = Int(effective.rounded())
+            guard steps != pendingSteps else { return }
+            pendingSteps = steps
             applyTask?.cancel()
+            guard steps != 0 else { return }
+            // Применяем через паузу после последнего щелчка
             applyTask = Task {
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .milliseconds(800))
                 guard !Task.isCancelled, pendingSteps != 0 else { return }
                 model.adjustRest(by: TimeInterval(pendingSteps * 15))
-                withAnimation(.easeOut(duration: 0.15)) {
-                    pendingSteps = 0
-                }
+                crownAnchor = crownSteps
+                pendingSteps = 0
             }
         }
     }
