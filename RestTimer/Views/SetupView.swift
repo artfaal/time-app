@@ -21,64 +21,55 @@ struct SetupView: View {
     let onStart: (Int, TimeInterval) -> Void
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 13) {
-                // Два круглых циферблата (1e): зелёная обводка = фокус Crown,
-                // тап переносит фокус. Кнопок −/+ нет — только колесо
-                HStack(spacing: 13) {
-                    dial(
-                        title: "ПОДХОДЫ",
-                        display: "\(totalSets)",
-                        fontSize: 26,
-                        field: .sets,
-                        value: $setsValue,
-                        range: 1...10
-                    )
-                    dial(
-                        title: "ОТДЫХ",
-                        display: Self.timeString(restSeconds),
-                        fontSize: 20,
-                        field: .rest,
-                        value: $restSteps,
-                        range: 2...20
-                    )
-                }
-
-                Button {
-                    WKInterfaceDevice.current().play(.click)
-                    onStart(totalSets, TimeInterval(restSeconds))
-                } label: {
-                    Text("СТАРТ")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .tracking(0.5)
-                        .foregroundStyle(.black)
-                        .frame(width: Theme.screenWidth * (262.0 / 410.0), height: 35)
-                        .background(Capsule().fill(.white))
-                }
-                .buttonStyle(.plain)
-
-                // Пресеты: тап — применить и сразу стартовать
-                HStack(spacing: 4) {
-                    presetChip(sets: 4, seconds: 120)
-                    presetChip(sets: 4, seconds: 90)
-                    presetChip(sets: 5, seconds: 120)
-                }
-
-                if notificationsDenied {
-                    Text("Уведомления запрещены — при опущенной руке вибрации не будет. Включи их для Rest в настройках часов.")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                }
+        VStack(spacing: 13) {
+            // Два круглых циферблата (1e): зелёная обводка = фокус Crown,
+            // тап переносит фокус. Кнопок −/+ нет — только колесо
+            HStack(spacing: 13) {
+                dial(
+                    title: "ПОДХОДЫ",
+                    display: "\(totalSets)",
+                    fontSize: 26,
+                    field: .sets,
+                    value: $setsValue,
+                    range: 1...10
+                )
+                dial(
+                    title: "ОТДЫХ",
+                    display: Self.timeString(restSeconds),
+                    fontSize: 20,
+                    field: .rest,
+                    value: $restSteps,
+                    range: 2...20
+                )
             }
-            // Сдвиг до эталонной вертикали (циферблаты у центра экрана);
-            // пресеты при этом уходят под фолд — доступны скроллом
-            .padding(.top, 28)
+
+            Button {
+                WKInterfaceDevice.current().play(.click)
+                onStart(totalSets, TimeInterval(restSeconds))
+            } label: {
+                Text("СТАРТ")
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .tracking(0.5)
+                    .foregroundStyle(.black)
+                    .frame(width: Theme.screenWidth * (262.0 / 410.0), height: 35)
+                    .background(Capsule().fill(.white))
+            }
+            .buttonStyle(.plain)
+
+            if notificationsDenied {
+                Text("Уведомления запрещены — при опущенной руке вибрации не будет. Включи их для Rest в настройках часов.")
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+            }
         }
-        .scrollIndicators(.hidden)
-        .contentMargins(.horizontal, 2, for: .scrollContent)
-        .contentMargins(.vertical, 2, for: .scrollContent)
-        .background(Theme.bgSetup.ignoresSafeArea())
+        // Группа чуть ниже середины полного экрана — как в эталоне: сверху
+        // воздух под системные часы, СТАРТ ближе к низу (сверено по пикселям)
+        .offset(y: 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.bgSetup)
+        .ignoresSafeArea()
         .onAppear {
             setsValue = Double(totalSets)
             restSteps = Double(restSeconds / 15)
@@ -139,27 +130,6 @@ struct SetupView: View {
             isContinuous: false,
             isHapticFeedbackEnabled: true
         )
-    }
-
-    private func presetChip(sets: Int, seconds: Int) -> some View {
-        Button {
-            WKInterfaceDevice.current().play(.click)
-            totalSets = sets
-            restSeconds = seconds
-            setsValue = Double(sets)
-            restSteps = Double(seconds / 15)
-            onStart(sets, TimeInterval(seconds))
-        } label: {
-            Text("\(sets)×\(Self.timeString(seconds))")
-                .font(.system(.caption2, design: .rounded).weight(.semibold))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(Color.white.opacity(0.10)))
-        }
-        .buttonStyle(.plain)
     }
 
     static func timeString(_ seconds: Int) -> String {

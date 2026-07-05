@@ -41,9 +41,10 @@ struct LaunchComplication: Widget {
 struct LaunchComplicationView: View {
     @Environment(\.widgetFamily) private var family
 
-    // Голубой — в тон иконке аппа, чтобы пиктограмма не была чёрной
-    private static let skyBlue = Color(red: 0.45, green: 0.75, blue: 1.0)
-    private static let deepBlue = Color(red: 0.15, green: 0.4, blue: 0.95)
+    // Оранжевый — в тон иконке и кольцу отдыха (дизайн 1e)
+    private static let amber = Color(red: 1.0, green: 0.72, blue: 0.35)
+    private static let accent = Color(red: 1.0, green: 138 / 255, blue: 26 / 255)   // #FF8A1A
+    private static let warmDark = Color(red: 46 / 255, green: 23 / 255, blue: 3 / 255)  // #2e1703
 
     var body: some View {
         Group {
@@ -55,7 +56,7 @@ struct LaunchComplicationView: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Self.skyBlue, .white],
+                            colors: [Self.amber, Self.accent],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -65,7 +66,7 @@ struct LaunchComplicationView: View {
         }
         .containerBackground(for: .widget) {
             LinearGradient(
-                colors: [Self.deepBlue.opacity(0.55), Self.deepBlue.opacity(0.25)],
+                colors: [Self.warmDark.opacity(0.9), Self.warmDark.opacity(0.35)],
                 startPoint: .top,
                 endPoint: .bottom
             )
