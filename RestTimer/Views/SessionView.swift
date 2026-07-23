@@ -304,6 +304,8 @@ private struct FinishedView: View {
                 .scaleEffect(pulsing ? 1.09 : 1.0)
                 .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: pulsing)
                 .onAppear { pulsing = true }
+                // Разовый салют при завершении всех подходов
+                ConfettiView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
@@ -328,5 +330,64 @@ private struct FinishedView: View {
             word = "подходов"
         }
         return "\(totalSets) \(word)"
+    }
+}
+
+// Разовый салют на экране финиша: конфетти сыпется сверху и затухает.
+// Самонарисованное и анимированное → в AOD гасим (конвенция проекта).
+private struct ConfettiView: View {
+    @Environment(\.isLuminanceReduced) private var dimmed
+    // Частицы готовы к ПЕРВОМУ кадру (fall=false, все вверху). Иначе, если
+    // заполнять их одновременно с fall=true, ForEach вставит капсулы сразу
+    // в конечном состоянии и падение не заанимируется
+    @State private var pieces = ConfettiPiece.make()
+    @State private var fall = false
+
+    var body: some View {
+        if !dimmed {
+            GeometryReader { geo in
+                ZStack {
+                    ForEach(pieces) { piece in
+                        Capsule()
+                            .fill(piece.color)
+                            .frame(width: piece.size, height: piece.size * 1.9)
+                            .rotationEffect(.degrees(fall ? piece.spin : 0))
+                            .position(
+                                x: geo.size.width / 2 + piece.x,
+                                y: fall ? geo.size.height + 40 : -40
+                            )
+                            .opacity(fall ? 0 : 1)
+                            .animation(.easeIn(duration: piece.duration).delay(piece.delay), value: fall)
+                    }
+                }
+                .onAppear { fall = true }
+            }
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
+        }
+    }
+}
+
+private struct ConfettiPiece: Identifiable {
+    let id = UUID()
+    let x: CGFloat          // отклонение от центра по горизонтали, pt
+    let spin: Double        // итоговый угол вращения
+    let duration: Double    // время падения
+    let delay: Double       // разброс старта, чтобы сыпалось не разом
+    let color: Color
+    let size: CGFloat
+
+    static func make() -> [ConfettiPiece] {
+        let palette: [Color] = [Theme.work, Theme.rest, .white]
+        return (0..<26).map { _ in
+            ConfettiPiece(
+                x: .random(in: -110...110),
+                spin: .random(in: 180...720) * (Bool.random() ? 1 : -1),
+                duration: .random(in: 1.1...1.9),
+                delay: .random(in: 0...0.5),
+                color: palette.randomElement()!,
+                size: .random(in: 5...8)
+            )
+        }
     }
 }
