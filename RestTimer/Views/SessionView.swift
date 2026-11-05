@@ -200,15 +200,30 @@ private struct RestingView: View {
                         .lineLimit(1)
                         .foregroundStyle(.white)
                 }
-                // Превью накопленной колесом дельты: под цифрами, внутри кольца,
-                // без сдвига самого таймера
+                // Номера подходов и превью дельты не сдвигают системный таймер.
                 .overlay {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("\(model.currentSet)")
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("\(model.currentSet + 1) из \(model.totalSets)")
+                            .foregroundStyle(dimmed ? .white.opacity(0.7) : Theme.rest)
+                    }
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.65))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Подход \(model.currentSet) завершён. Далее подход \(model.currentSet + 1) из \(model.totalSets)")
+                    .offset(y: 52)
+
                     if pendingSteps != 0 {
                         Text(pendingLabel)
                             .font(.system(size: 17, weight: .heavy, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(Theme.rest.opacity(0.85))
-                            .offset(y: 52)
+                            .offset(y: 76)
                             .transition(.opacity)
                     }
                 }
