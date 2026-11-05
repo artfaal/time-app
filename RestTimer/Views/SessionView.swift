@@ -223,7 +223,7 @@ private struct RestingView: View {
                             .font(.system(size: 17, weight: .heavy, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(Theme.rest.opacity(0.85))
-                            .offset(y: 76)
+                            .offset(y: 70)
                             .transition(.opacity)
                     }
                 }
